@@ -33,7 +33,7 @@ class MultimodalBackbone(nn.Module):
         self.backbones = nn.ModuleDict({
             'main':     ConvBackbone(output_dim=512),
             'chroma':   PDCNN2Backbone(output_dim=512),
-            'mfcc':     LSTMBackbone(input_dim=20,hidden_dim=256,num_layers=2,output_dim=128),
+            'mfcc':     LSTMBackbone(input_dim=13,hidden_dim=256,num_layers=2,output_dim=128),
             'spec_amp': LinearBackbone(input_dim=get_config("default_torchaudio_args")["input_size"],hidden_dim=256,output_dim=128),
             'mel_amp':  LinearBackbone(input_dim=get_config("default_torchaudio_args")["input_size"],hidden_dim=256,output_dim=128),
             'spec_rms': LinearBackbone(input_dim=get_config("default_torchaudio_args")["input_size"],hidden_dim=256,output_dim=128),

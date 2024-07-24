@@ -34,7 +34,7 @@ class Sound2SynthModel(pl.LightningModule):
         return [optimizer], [scheduler]
          
     def train_dataloader(self):
-        return HeavenDataLoader(DataLoader(self.args.datasets.train,batch_size=self.args.batch_size,num_workers=8,shuffle=True), self.args.datasets.train)
+        return HeavenDataLoader(DataLoader(self.args.datasets.train,batch_size=self.args.batch_size,num_workers=8,shuffle=False), self.args.datasets.train)
     
     def val_dataloader(self):
         return HeavenDataLoader(DataLoader(self.args.datasets.val,batch_size=self.args.batch_size,num_workers=8,shuffle=False), self.args.datasets.val)
@@ -44,7 +44,7 @@ class Sound2SynthModel(pl.LightningModule):
     
     def run_batch(self, batch, split='train', batch_idx=-1):
         (specs, sample_rates), (parameters, gradients) = batch; pred = self(specs)
-        parameters = [self.interface.from_dict(LoadJson(par)) for par in parameters]
+        parameters = [self.interface.from_tensor(par) for par in parameters]
         gradients = [LoadJson(g) if g!="" else {key:1 for key in self.interface.parameters()} for g in gradients]
         weights = {key:torch.tensor([g[key] for g in gradients], dtype=torch.float).type_as(pred) for key in self.interface.parameters()}
         true = torch.stack([p.to_tensor() for p in parameters]).type_as(pred).detach(); w = {k:w.detach() for k,w in weights.items()}

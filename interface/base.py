@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 import numpy as np
 
+from torchsynth.signal import Signal
+
 class BaseInterface(object):
     regression_nclasses = 256
     regression_parameters = list()
@@ -37,15 +39,23 @@ class BaseInterface(object):
                 {"value":self.data[key] if key in self.data else None,"param":param,"interface":self}
             )
     
+    # @classmethod
+    # def from_tensor(cls, data):
+    #     index = 0; result = {}
+    #     for key, classes in cls.classification_parameters:
+    #         result[key] = float(torch.argmax(data[index:index+classes]))/(classes-1)
+    #         index += classes
+    #     for key in cls.regression_parameters:
+    #         result[key] = float(torch.argmax(data[index:index+cls.regression_nclasses]))/cls.regression_nclasses
+    #         index += cls.regression_nclasses
+    #     return cls.from_dict(result)
+    
     @classmethod
     def from_tensor(cls, data):
-        index = 0; result = {}
-        for key, classes in cls.classification_parameters:
-            result[key] = float(torch.argmax(data[index:index+classes]))/(classes-1)
-            index += classes
-        for key in cls.regression_parameters:
-            result[key] = float(torch.argmax(data[index:index+cls.regression_nclasses]))/cls.regression_nclasses
-            index += cls.regression_nclasses
+        result = {}
+        # Have not reimplemented classifcation parameters as they are not used in the current codebase
+        for i, key in enumerate(cls.regression_parameters):
+            result[key] = data[i].item()
         return cls.from_dict(result)
     
     def to_tensor(self):
@@ -100,6 +110,10 @@ class ParameterSpaceLoss(nn.Module):
         if regl is not None:
             for key in self.regp:
                 result[key] = regl(pred[:,index:index+self.regn],true[:,index:index+self.regn])
+                # print(result[key], weights[key])
+                # import pdb; pdb.set_trace()
                 keys.add(key); index += self.regn
+
         losses = sum(result[key]*weights[key] for key in keys)/(sum(weights[key] for key in keys)+1e-9)
-        return losses.mean()
+        # print(losses, self.regp)
+        return losses.mean() if isinstance(losses, Signal) else torch.tensor(losses)

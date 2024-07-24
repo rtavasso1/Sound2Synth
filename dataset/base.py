@@ -4,7 +4,7 @@ from utils.audio_utils import *
 from torch.utils.data import Dataset
 
 class AudioDataset(Dataset):
-    def __init__(self, name=None, splits=None, with_params=False, with_gradient=False, augment=0.0):
+    def __init__(self, name=None, splits=None, with_params=False, with_gradient=False, augment=0.0, **kwargs):
         if name is not None:
             self.name = name; self.splits = splits
             self.path = pjoin(get_config("server_data_dir").split(':')[-1],name); data = ListFiles(self.path, ordered=True)

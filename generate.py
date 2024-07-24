@@ -69,58 +69,13 @@ if __name__=="__main__":
         backbone = get_backbone(args.backbone, args),
         classifier = get_classifier(args.classifier, interface, args),
     )
-    
-    # Save Arguments
-    args.identifier = Identifier(args)
-    SaveJson(args,pjoin("tasks", f"{args.identifier}.json"),indent=4)
 
     # Prepare dataset
     args.datasets = MemberDict({
-        'train': DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='train'),
-        'val' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='test'),
-        'test' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='test'),
+        'train': DATASET_MAPPING[args.dataset_type](dir=DATASET_PATHS[args.dataset], split='train'),
+        'val' : DATASET_MAPPING[args.dataset_type](dir=DATASET_PATHS[args.dataset], split='test'),
+        'test' : DATASET_MAPPING[args.dataset_type](dir=DATASET_PATHS[args.dataset], split='test'),
     })
-
-    # Prepare W&B logger
-    if args.wandb:
-        wandb_logger = WandbLogger(
-            project=args.project,
-            name=args.dataset + '_' + args.run_name,
-        )
-
+    
     # Train model
     model = Sound2SynthModel(net, interface, args=args)
-    trainer = pl.Trainer(
-        max_epochs = args.num_epochs,
-        gradient_clip_val = 1.0,
-        accumulate_grad_batches = args.grad_accum,
-        callbacks = [
-            # StochasticWeightAveraging(swa_lrs=0.05),
-            LearningRateMonitor(logging_interval='epoch'),
-            ModelCheckpoint(monitor='valid_celoss', dirpath=f'checkpoints/{args.run_name}/', filename='ckpt-{epoch:02d}-{valid_celoss:.2f}'),
-            EarlyStopping(monitor='valid_celoss',mode='min',patience=8,check_finite=True),
-        ],
-
-        # GPU configuration
-        accelerator = 'gpu',
-        devices=args.n_gpu,
-
-        # Logging configuration
-        logger = wandb_logger if args.wandb else True,
-        log_every_n_steps = 100,
-        
-        # Speedup configuration
-        benchmark = True,
-        # strategy = DDPPlugin(find_unused_parameters=(args.model=='group')),
-        limit_train_batches = args.limit_train_batches,
-        limit_val_batches = args.limit_val_batches,
-
-        # Tuning configuration
-        auto_lr_find = False,   # 2e-4
-        precision = 16,
-    )
-
-    if args.wandb:
-        wandb_logger.watch(model)
-    trainer.fit(model)
-    trainer.test(ckpt_path="best")

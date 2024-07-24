@@ -13,3 +13,8 @@ server/output/
 Sound2Synth/
 tasks/
 wandb/
+data/
+output_wavs/
+*.pt
+*.wav
+checkpoints/

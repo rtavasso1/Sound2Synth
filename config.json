@@ -22,8 +22,8 @@
     "default_torchaudio_args": {
         "sample_rate": 48000,
             "// sample_rate": 44100,
-        "input_size": 377,
-            "// input_size": 347,
+        "input_size": 376,
+            "// input_size": 938,
         "audio_length": 192819,
             "// audio_length": 177152,
         "n_fft": 2048,

@@ -5,7 +5,7 @@ from pyheaven.torch_utils import *
 
 class LSTMBackbone(nn.Module):
     def __init__(self,
-        input_dim = 20,
+        input_dim = 13,
         hidden_dim = 512,
         num_layers = 3,
         output_dim = 2048,
