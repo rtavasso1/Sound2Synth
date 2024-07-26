@@ -26,21 +26,21 @@ class Sound2SynthModel(pl.LightningModule):
             weight_decay = self.args.weight_decay,
         )
         scheduler = LinearWarmupCosineAnnealingLR(optimizer,
-            warmup_epochs = self.args.warmup_epochs,
-            max_epochs = self.args.num_epochs,
+            warmup_epochs = 2000, #self.args.warmup_epochs,
+            max_epochs = 30000, #self.args.num_epochs,
             warmup_start_lr = self.args.warmup_start_lr_ratio*self.args.learning_rate,
             eta_min = self.args.eta_min,
         )
-        return [optimizer], [scheduler]
+        return [optimizer], [{'scheduler': scheduler, 'interval': 'step'}]
          
     def train_dataloader(self):
-        return HeavenDataLoader(DataLoader(self.args.datasets.train,batch_size=self.args.batch_size,num_workers=8,shuffle=False), self.args.datasets.train)
+        return HeavenDataLoader(DataLoader(self.args.datasets.train,batch_size=self.args.batch_size,num_workers=8,shuffle=False, drop_last=True), self.args.datasets.train)
     
     def val_dataloader(self):
-        return HeavenDataLoader(DataLoader(self.args.datasets.val,batch_size=self.args.batch_size,num_workers=8,shuffle=False), self.args.datasets.val)
+        return HeavenDataLoader(DataLoader(self.args.datasets.val,batch_size=self.args.batch_size,num_workers=8,shuffle=False, drop_last=True), self.args.datasets.val)
     
     def test_dataloader(self):
-        return HeavenDataLoader(DataLoader(self.args.datasets.test,batch_size=1,num_workers=8,shuffle=False), self.args.datasets.test)
+        return HeavenDataLoader(DataLoader(self.args.datasets.test,batch_size=1,num_workers=8,shuffle=False, drop_last=True), self.args.datasets.test)
     
     def run_batch(self, batch, split='train', batch_idx=-1):
         (specs, sample_rates), (parameters, gradients) = batch; pred = self(specs)
@@ -48,14 +48,14 @@ class Sound2SynthModel(pl.LightningModule):
         gradients = [LoadJson(g) if g!="" else {key:1 for key in self.interface.parameters()} for g in gradients]
         weights = {key:torch.tensor([g[key] for g in gradients], dtype=torch.float).type_as(pred) for key in self.interface.parameters()}
         true = torch.stack([p.to_tensor() for p in parameters]).type_as(pred).detach(); w = {k:w.detach() for k,w in weights.items()}
-        loss = self.criteria(pred, true, w)
+        loss = self.criteria(pred, true, w, loss_type='audioloss' if self.args.resume_from_checkpoint is not None else None)
         result = {
             'src': batch,
             'prd': pred,
             'tgt': true,
             'loss': loss,
             'stats': {
-                self.criteria.default_loss_type: float(loss.item()),
+                self.args.resume_from_checkpoint if self.args.resume_from_checkpoint is not None else self.criteria.default_loss_type: float(loss.item()),
             }
         }
         if split!='train':

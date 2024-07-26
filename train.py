@@ -19,6 +19,7 @@ if __name__=="__main__":
         LiteralArgumentDescriptor("synth", short="s", choices=INTERFACE_MAPPING.keys(), default="TorchSynth"),
         LiteralArgumentDescriptor("dataset_type", short="dt", choices=DATASET_MAPPING.keys(), default="my_multimodal"),
         StrArgumentDescriptor("dataset", short="ds", default="SimpleSynth"),
+        StrArgumentDescriptor("chain", short="ch", default="SimpleSynth"),
         StrArgumentDescriptor("project", short="pj", default="SynthGPT"),
         StrArgumentDescriptor("run_name", short="rn", default="Base"),
 
@@ -47,6 +48,9 @@ if __name__=="__main__":
         IntArgumentDescriptor("debug", default=-1),
         SwitchArgumentDescriptor("clean"),
         SwitchArgumentDescriptor("wandb",short='wandb'),
+        
+        # Add a new argument for the checkpoint path
+        StrArgumentDescriptor("resume_from_checkpoint", short="cp", default=None)
     ])
     if args.clean:
         CMD("rm -rf lightning_logs/*")
@@ -76,9 +80,9 @@ if __name__=="__main__":
 
     # Prepare dataset
     args.datasets = MemberDict({
-        'train': DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='train'),
-        'val' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='test'),
-        'test' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.dataset, split='test'),
+        'train': DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.chain, split='train'),
+        'val' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.chain, split='test'),
+        'test' : DATASET_MAPPING[args.dataset_type](dir='data/'+args.dataset, chain=args.chain, split='test'),
     })
 
     # Prepare W&B logger
@@ -91,13 +95,13 @@ if __name__=="__main__":
     # Train model
     model = Sound2SynthModel(net, interface, args=args)
     trainer = pl.Trainer(
-        max_epochs = args.num_epochs,
+        max_epochs = args.num_epochs if args.resume_from_checkpoint is None else args.num_epochs + 10,
         gradient_clip_val = 1.0,
         accumulate_grad_batches = args.grad_accum,
         callbacks = [
             # StochasticWeightAveraging(swa_lrs=0.05),
             LearningRateMonitor(logging_interval='epoch'),
-            ModelCheckpoint(monitor='valid_celoss', dirpath=f'checkpoints/{args.run_name}/', filename='ckpt-{epoch:02d}-{valid_celoss:.2f}'),
+            ModelCheckpoint(monitor='valid_celoss', dirpath=f'checkpoints/{args.run_name}/', filename='ckpt-{epoch:02d}-{valid_celoss:.2f}', save_top_k=1, mode='min', save_last=True),
             EarlyStopping(monitor='valid_celoss',mode='min',patience=8,check_finite=True),
         ],
 
@@ -117,7 +121,9 @@ if __name__=="__main__":
 
         # Tuning configuration
         auto_lr_find = False,   # 2e-4
-        precision = 16,
+        precision = 32,
+        
+        resume_from_checkpoint=args.resume_from_checkpoint if args.resume_from_checkpoint else None,
     )
 
     if args.wandb:

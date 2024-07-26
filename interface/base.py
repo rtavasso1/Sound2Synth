@@ -107,12 +107,17 @@ class ParameterSpaceLoss(nn.Module):
                 result[key] = clsl(pred[:,index:index+classes],true[:,index:index+classes])
                 keys.add(key); index += classes
         index = sum(classes for _, classes in self.clsp)
-        if regl is not None:
+        if regl is not None and loss_type != 'audioloss':
             for key in self.regp:
                 result[key] = regl(pred[:,index:index+self.regn],true[:,index:index+self.regn])
                 # print(result[key], weights[key])
                 # import pdb; pdb.set_trace()
                 keys.add(key); index += self.regn
+                
+        if regl is not None and loss_type == 'audioloss':
+            result['audioloss'] = regl(pred, true)
+            weights['audioloss'] = 1
+            keys.add('audioloss')
 
         losses = sum(result[key]*weights[key] for key in keys)/(sum(weights[key] for key in keys)+1e-9)
         # print(losses, self.regp)
