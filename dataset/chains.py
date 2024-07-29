@@ -19,11 +19,11 @@ import torch
 from torchsynth.synth import Voice
 
 class SimpleSynth(AbstractSynth):
-    def __init__(self, synthconfig: Optional[SynthConfig] = None):
-        super().__init__(synthconfig=synthconfig)
+    def __init__(self, synthconfig: Optional[SynthConfig] = None, *args, **kwargs):
+        super().__init__(synthconfig=synthconfig, *args, **kwargs)
         self.add_synth_modules(
             [
-                ("keyboard", MonophonicKeyboard, {"midi_f0": torch.tensor(60.0).repeat(synthconfig.batch_size), "duration": torch.tensor(5.0).repeat(synthconfig.batch_size)}), # 2 params 
+                ("keyboard", MonophonicKeyboard, {"midi_f0": torch.tensor(60.0).repeat(synthconfig.batch_size), "duration": torch.tensor(3.0).repeat(synthconfig.batch_size)}), # 2 params 
                 ("adsr", ADSR), # 5 params 
                 ("upsample", ControlRateUpsample),
                 ("vco", SquareSawVCO), # 4 param
@@ -42,8 +42,8 @@ class SimpleSynth(AbstractSynth):
         return out
     
 class Synplant2(AbstractSynth):
-    def __init__(self, synthconfig: Optional[SynthConfig] = None):
-        super().__init__(synthconfig=synthconfig)
+    def __init__(self, synthconfig: Optional[SynthConfig] = None, *args, **kwargs):
+        super().__init__(synthconfig=synthconfig, *args, **kwargs)
         self.add_synth_modules([
             ('keyboard', MonophonicKeyboard, {"midi_f0": torch.tensor(60.0).repeat(synthconfig.batch_size), "duration": torch.tensor(5.0).repeat(synthconfig.batch_size)}),
             ('vol_adsr', ADSR),

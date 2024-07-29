@@ -46,13 +46,36 @@ class RegressionLpDistance(nn.Module):
         super().__init__(); self.p = p
     def forward(self, pred, true):
         return (pred.argmax(dim=-1)-true.argmax(dim=-1)).abs()**self.p / (true.shape[-1]-1)
+
+class DifferentiableArgmax(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, input):
+        idx = input.argmax(dim=-1)
+        output = F.one_hot(idx, num_classes=input.size(-1)).float()
+        ctx.save_for_backward(input, output)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        input, output = ctx.saved_tensors
+        grad_input = grad_output * output
+        return grad_input
     
+def softargmax1d(input, beta=100):
+    *_, n = input.shape
+    input = nn.functional.softmax(beta * input, dim=-1)
+    indices = torch.linspace(0, 1, n, device=input.device, dtype=input.dtype)
+    result = torch.sum((n - 1) * input * indices, dim=-1)
+    return result
+
 class AudioLoss(nn.Module):
-    def __init__(self, scales, synth):
+    def __init__(self, scales, synth, device='cpu'):
         super().__init__()
         self.scales = scales
+        self.device = device
         synth_class = getattr(chains, synth)
-        self.synth = synth_class(SynthConfig(batch_size=32, sample_rate=48000, reproducible=False, buffer_size_seconds=4, no_grad=False))
+        self.synth = synth_class(SynthConfig(batch_size=32, sample_rate=48000, reproducible=False, buffer_size_seconds=4, no_grad=False)).to(device)
+        print(self.synth.device)
         self.unnormalizer = {}
         for n, p in self.synth.named_parameters():
             n = n.split('.')
@@ -87,12 +110,13 @@ class AudioLoss(nn.Module):
         return stfts
     
     def forward(self, pred, true):
-        waveform = self.params_to_audio(pred, self.unnormalizer, logits=True, from_0to1=True)
-        reference_audio = self.params_to_audio(true, self.unnormalizer, logits=True, from_0to1=(true.max() <= 1).item())
-        
+        waveform = self.params_to_audio(pred, self.unnormalizer, logits=True, from_0to1=True).to(pred.device)
+        reference_audio = self.params_to_audio(true, self.unnormalizer, logits=True, from_0to1=(true.max() <= 1).item()).to(pred.device)
+
+        # print(torch.isclose(waveform, reference_audio).all())
         pred_stfts = self.multiscale_fft(waveform.squeeze(), self.scales, 0.75) # [2048, 1024, 512, 256, 128, 64]
         true_stfts = self.multiscale_fft(reference_audio.squeeze(), self.scales, 0.75)
-
+        # print(torch.isclose(pred_stfts[0], true_stfts[0]).all())
         pred_stfts_log = [self.safe_log(stft) for stft in pred_stfts]
         true_stfts_log = [self.safe_log(stft) for stft in true_stfts]
 
@@ -104,21 +128,21 @@ class AudioLoss(nn.Module):
     
     def params_to_audio(self, outputs, unnormalizer, logits, from_0to1):
         n_params = len(unnormalizer)
- 
+
         if logits:
             outputs = torch.stack(outputs.squeeze(0).chunk(n_params, dim=-1))
-            outputs = outputs.argmax(dim=-1)/(outputs.shape[-1]-1)
+            outputs = softargmax1d(outputs)/(outputs.shape[-1]-1)
 
         mydict = {}
         assert len(unnormalizer) == len(outputs), f"Length mismatch: {len(unnormalizer)} vs {len(outputs)}"
         for (k, f), v in zip(unnormalizer.items(), outputs):
             if 'keyboard' in k:
                 continue # Skip keyboard parameters as they are initialized frozen
-            mydict[k] = f.from_0to1(v) if from_0to1 else v
-            # print(mydict[k].shape)
+            mydict[k] = f.from_0to1(v).to(self.device) if from_0to1 else v.to(self.device)
+            # print(mydict[k].max(), mydict[k].min())
             
         self.synth.set_parameters(mydict)
-        # print(self.synth.keyboard.torchparameters.midi_f0)
+        # print(self.synth.get_parameters())
         audio = self.synth.output()
         return audio
         

@@ -48,14 +48,15 @@ class Sound2SynthModel(pl.LightningModule):
         gradients = [LoadJson(g) if g!="" else {key:1 for key in self.interface.parameters()} for g in gradients]
         weights = {key:torch.tensor([g[key] for g in gradients], dtype=torch.float).type_as(pred) for key in self.interface.parameters()}
         true = torch.stack([p.to_tensor() for p in parameters]).type_as(pred).detach(); w = {k:w.detach() for k,w in weights.items()}
-        loss = self.criteria(pred, true, w, loss_type='audioloss' if self.args.resume_from_checkpoint is not None else None)
+        loss = self.criteria(pred, true, w, loss_type='audioloss') # if self.args.resume_from_checkpoint is not None else None)
         result = {
             'src': batch,
             'prd': pred,
             'tgt': true,
             'loss': loss,
             'stats': {
-                self.args.resume_from_checkpoint if self.args.resume_from_checkpoint is not None else self.criteria.default_loss_type: float(loss.item()),
+                # self.args.resume_from_checkpoint if self.args.resume_from_checkpoint is not None else self.criteria.default_loss_type: float(loss.item()),
+                self.criteria.default_loss_type: float(loss.item())
             }
         }
         if split!='train':
