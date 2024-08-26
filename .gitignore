@@ -15,6 +15,12 @@ tasks/
 wandb/
 data/
 output_wavs/
+patches/
+SynplantPatches/
+NewLoopsProExpansion/
+Vengeance/
+DexedJson/
+Ambient_Plants/
 *.pt
 *.wav
 checkpoints/

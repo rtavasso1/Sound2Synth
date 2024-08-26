@@ -81,7 +81,7 @@ def main():
                 'sample_rate': args['--sample_rate'],
                 'params': params.detach().cpu(),
             }
-
+            # print(params.shape)
             parent_dir = train_dir if is_training else test_dir
             if not args['--dry_run']:
                 torch.save(dic, parent_dir / f'sound_{n}.pt')

@@ -1,7 +1,7 @@
 from .base import AudioDataset
 from .spec import SpecDataset, MelDataset, MFCCDataset
 from .multimodal import MultiModalDataset
-from .my_multimodal import MyMultiModalDataset
+from .my_multimodal import MyMultiModalDataset, VengeanceDataset
 
 DATASET_MAPPING = {
     'audio': AudioDataset,
@@ -10,6 +10,7 @@ DATASET_MAPPING = {
     'mfcc': MFCCDataset,
     'multimodal': MultiModalDataset,
     'my_multimodal': MyMultiModalDataset,
+    'vengeance': VengeanceDataset,
 }
 
 DATASET_PATHS = {

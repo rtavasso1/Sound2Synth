@@ -1,4 +1,5 @@
 import torch
+import torchaudio
 import numpy as np
 from utils import *
 import librosa as lbrs
@@ -31,9 +32,38 @@ def audio_to_mfcc(audio, sample_rate, augment=None):
         mfcc = torch.clip(mfcc, -1, 1)
     return mfcc
 
-def audio_to_features(file, augment=None, save=False):
-    audio, sample_rate, params = torch.load(file).values()
-    
+resample = torchaudio.transforms.Resample(orig_freq=44100, new_freq=48000)
+
+def audio_to_features(file, augment=None, save=False, from_wav=False):
+    if from_wav:
+        if not file.endswith('.wav'):
+            return
+        # check if file has already been processed
+        path = file.split('/')
+        path.insert(1, 'processed')
+        path = '/'.join(path)
+        print(file, path)
+        if os.path.exists(path):
+            return
+        try:
+            audio, sample_rate = torchaudio.load(file)
+        except:
+            return
+        if sample_rate != 48000:
+            if sample_rate != 44100:
+                return
+                # raise ValueError(f"Sample rate {sample_rate} not supported")
+            audio = resample(audio)
+        if audio.size(0) > 1:
+            audio = audio.mean(dim=0)
+        audio = audio.squeeze()[:4*48000]
+        # pad if necessary
+        if audio.size(0) < 4*48000:
+            audio = torch.cat([audio, torch.zeros(4*48000 - audio.size(0))])
+        params = torch.tensor(0.)
+    else:
+        audio, sample_rate, params = torch.load(file).values()
+
     label = (params, "")
     # print(audio, sample_rate, label)
     spec = audio_to_spec(audio, sample_rate, augment)
@@ -71,37 +101,70 @@ def audio_to_features(file, augment=None, save=False):
         torch.tensor(lbrs.feature.chroma_cqt(y=audio.numpy(), sr=sample_rate, n_octaves=1, fmin=fmins[oct - 1], n_chroma=48, bins_per_octave=48)).transpose(-1, -2).float() for oct in range(1, 10)
     ]
     features['chroma'] = torch.cat(oct_cqt, dim=-1)
-    
+
     if save:
         # save in different folder
         path = file.split('/')
-        path[-2] = 'processed'
+        # path[-2] = 'processed'
+        path.insert(1, 'processed')
         path = '/'.join(path)
-        torch.save(features, path)
+        # make sure the folder exists
+        os.makedirs('/'.join(path.split('/')[:-1]), exist_ok=True)
+        print(path)
+        # torch.save(features, path)
 
     return features
 
-if __name__ == '__main__':
-    args_config = {
-        '--chain': 'SimpleSynth',
-        '--name': 'SimpleSynth',
-    }
-    args = parse_args(sys.argv[1:], args_config)
-    name = args['--name']
-    
-    for split in ['train', 'test']:
-        path = f'data/{name}/{split}/unprocessed/'
+import os
 
-        files = os.listdir(path)
+def find_all_files(directory):
+    file_paths = []
+
+    # Walk through the directory
+    for root, _, files in os.walk(directory):
+        for file in files:
+            # Join the root directory and file name to get the full file path
+            file_path = os.path.join(root, file)
+            file_paths.append(file_path)
+
+    return file_paths
+
+
+# if __name__ == '__main__':
+#     args_config = {
+#         '--chain': 'SimpleSynth',
+#         '--name': 'SimpleSynth',
+#     }
+#     args = parse_args(sys.argv[1:], args_config)
+#     name = args['--name']
+
+#     for split in ['train', 'test']:
+#         path = f'data/{name}/{split}/unprocessed/'
+
+#         files = os.listdir(path)
+#         if len(files) == 0:
+#             print(f"No files found in {path}")
+
+#         # create folder if not exists
+#         os.makedirs('/'.join(path.split('/')[:-2])+'/processed', exist_ok=True)
+
+#         for i, file in enumerate(files):
+#             if file.endswith('.pt'):
+#                 features = audio_to_features(path + file, save=True)
+
+#             if i % 100 == 0:
+#                 print(f"Processed {i}/{len(files)} {split} files")
+
+if __name__ == "__main__":
+        path = "Vengeance"
+
+        # files = os.listdir(path)
+        files = find_all_files(path)
         if len(files) == 0:
             print(f"No files found in {path}")
-            
-        # create folder if not exists
-        os.makedirs('/'.join(path.split('/')[:-2])+'/processed', exist_ok=True)
-        
+
         for i, file in enumerate(files):
-            if file.endswith('.pt'):
-                features = audio_to_features(path + file, save=True)
-            
+            features = audio_to_features(file, save=True, from_wav=True)
+
             if i % 100 == 0:
-                print(f"Processed {i}/{len(files)} {split} files")
+                print(f"Processed {i}/{len(files)}")

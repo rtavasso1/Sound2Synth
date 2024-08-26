@@ -36,7 +36,7 @@ class SynplantOsc(m.VCO):
             name="a_freq",),
     ]
 
-    def oscillator(self, argument: Signal, midi_f0: T) -> Signal:
+    def oscillator(self, argument: Signal, midi_f0: T, module_tensors=None) -> Signal:
         """
         Generates output square/saw audio given a phase argument.
 
@@ -44,9 +44,9 @@ class SynplantOsc(m.VCO):
             argument: The phase of the oscillator at each time sample.
             midi_f0: Fundamental frequency in midi.
         """
-        partials = self.partials_constant(midi_f0).unsqueeze(1)
+        partials = self.partials_constant(midi_f0, module_tensors).unsqueeze(1)
         square = torch.tanh(torch.pi * partials * torch.sin(argument) / 2)
-        a_form = self.p("a_form")
+        a_form = self.p("a_form", module_tensors=module_tensors)
 
         # slowww
         output = torch.zeros_like(argument)
@@ -67,7 +67,7 @@ class SynplantOsc(m.VCO):
 
         return output
 
-    def partials_constant(self, midi_f0):
+    def partials_constant(self, midi_f0, module_tensors=None):
         """
         Calculates a value to determine the number of overtones in the resulting
         square / saw wave, in order to keep aliasing at an acceptable level.
@@ -78,8 +78,8 @@ class SynplantOsc(m.VCO):
         Args:
             midi_f0: Fundamental frequency in midi.
         """
-        max_pitch = (
-            midi_f0 + self.p("tuning") + torch.maximum(self.p("mod_depth"), tensor(0))
+        max_pitch = midi_f0 + torch.maximum(
+            self.p("mod_depth", module_tensors=module_tensors), tensor(0)
         )
         max_f0 = util.midi_to_hz(max_pitch)
         return 12000 / (max_f0 * torch.log10(max_f0))

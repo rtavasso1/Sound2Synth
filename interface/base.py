@@ -97,8 +97,8 @@ class BaseInterface(object):
 class ParameterSpaceLoss(nn.Module):
     def __init__(self, default_loss_type='celoss', regression_parameters=list(), classification_parameters=list(), regression_nclasses=list()):
         super().__init__(); self.default_loss_type = default_loss_type; self.regp = regression_parameters; self.clsp = classification_parameters; self.regn = regression_nclasses
-    
-    def forward(self, pred, true, weights, loss_type=None):
+
+    def forward(self, pred, true, weights, loss_type=None, from_params=True, orig_len=None):
         loss_type = self.default_loss_type if loss_type is None else loss_type
         clsl = LOSSES_MAPPING[loss_type]['clsl']; regl = LOSSES_MAPPING[loss_type]['regl']
         index = 0; result = {}; keys = set()
@@ -110,15 +110,12 @@ class ParameterSpaceLoss(nn.Module):
         if regl is not None and loss_type != 'audioloss':
             for key in self.regp:
                 result[key] = regl(pred[:,index:index+self.regn],true[:,index:index+self.regn])
-                # print(result[key], weights[key])
-                # import pdb; pdb.set_trace()
-                keys.add(key); index += self.regn
-                
-        if regl is not None and loss_type == 'audioloss':
-            result['audioloss'] = regl(pred, true)
-            weights['audioloss'] = 1
-            keys.add('audioloss')
+                keys.add(key)
+                index += self.regn
+        if regl is not None and loss_type == "audioloss":
+            return regl(pred, true, from_params=from_params, orig_len=orig_len)
 
         losses = sum(result[key]*weights[key] for key in keys)/(sum(weights[key] for key in keys)+1e-9)
-        # print(losses, self.regp)
-        return losses.mean() if isinstance(losses, Signal) else torch.tensor(losses)
+        if isinstance(losses, float):
+            losses = torch.tensor(losses)
+        return losses.mean() # if isinstance(losses, Signal) else torch.tensor(losses).mean()

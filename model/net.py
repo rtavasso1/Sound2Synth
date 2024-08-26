@@ -4,6 +4,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from pyheaven.torch_utils import *
 
+class myFC(nn.Module):
+    def __init__(self, input_dim, output_dim):
+        super().__init__()
+        self.l = nn.Linear(input_dim, output_dim)
+        
+    def forward(self, x):
+        return nn.functional.leaky_relu(self.l(x))
+
 class NaiveParametersClassifier(nn.Module):
     def __init__(self, division, input_dim = 2048, hidden_dim_per_group = 64):
         super(NaiveParametersClassifier, self).__init__()
@@ -16,6 +24,8 @@ class NaiveParametersClassifier(nn.Module):
         self.lin1 = FC(self.input_dim, self.hidden_dim, dropout=None, activation=nn.LeakyReLU(inplace=True))
         self.lin2 = GroupFC(hidden_division, hidden_division, dropout=None, activation=nn.LeakyReLU(inplace=True))
         self.lin3 = GroupFC(hidden_division, division, dropout=None, activation=nn.Identity())
+        # self.lin2 = myFC(self.hidden_dim, self.hidden_dim)
+        # self.lin3 = myFC(self.hidden_dim, self.output_dim)
 
     def forward(self, x):
         return self.lin3(self.lin2(self.lin1(x)))
